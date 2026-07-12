@@ -5,17 +5,21 @@
 @author: Christopher
 """
 
+import os
+import sys
 import requests
 import json
-from utils import companies
+from utils import companies, API_KEY, DATA_DIR
 
 def get_cash_flow(company):
-    resp = requests.get(f"https://financialmodelingprep.com/api/v3/financials/cash-flow-statement/{company}")
+    url = "https://financialmodelingprep.com/stable/cash-flow-statement"
+    resp = requests.get(url, params={"symbol": company, "limit": 5, "apikey": API_KEY})
     resp = resp.json()
-    file = open(f"cash-flow-{company}.txt", "w")
-    json.dump(resp, file, indent=2)
-    file.close()
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(f"{DATA_DIR}/cash-flow-{company}.txt", "w") as file:
+        json.dump(resp, file, indent=2)
 
 
-for company in companies:
+tickers = sys.argv[1:] if len(sys.argv) > 1 else companies
+for company in tickers:
     get_cash_flow(company)

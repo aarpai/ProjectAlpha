@@ -6,20 +6,23 @@
 """
 
 #write company profile
-#https://financialmodelingprep.com/api/v3/company/profile/
+#https://financialmodelingprep.com/stable/profile
 
+import os
+import sys
 import requests
 import json
-from utils import companies
+from utils import companies, API_KEY, DATA_DIR
 
-def get_income_statement(company):
-    resp = requests.get(f"https://financialmodelingprep.com/api/v3/company/profile/{company}")
+def get_company_profile(company):
+    url = "https://financialmodelingprep.com/stable/profile"
+    resp = requests.get(url, params={"symbol": company, "apikey": API_KEY})
     resp = resp.json()
-    file = open(f"company-profile-{company}.txt", "w")
-    json.dump(resp, file, indent=2)
-    file.close()
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(f"{DATA_DIR}/company-profile-{company}.txt", "w") as file:
+        json.dump(resp, file, indent=2)
 
 
-for company in companies:
-    get_income_statement(company)
-    
+tickers = sys.argv[1:] if len(sys.argv) > 1 else companies
+for company in tickers:
+    get_company_profile(company)

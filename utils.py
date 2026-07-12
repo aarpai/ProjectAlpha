@@ -1,13 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import json
+import os
 
 """
 
 @author: Christopher
 """
-# FOR BACKTESTING IN 2015 HIDE COMPANIES: 
+# FOR BACKTESTING IN 2015 HIDE COMPANIES:
 DATA_DIR = "data"
+
+
+def _load_api_key():
+    key = os.environ.get("FMP_API_KEY")
+    if key:
+        return key
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("FMP_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    return None
+
+
+API_KEY = _load_api_key()
 
 companies = [
     
@@ -87,20 +105,16 @@ companies = [
 
 
 #FUNCTIONS THAT GRAB ALL THE DATA WE NEED FROM THE COMPANY PROFILES, CASH FLOW STATEMENTS, BALANCE SHEET, AND INCOME STATEMENT
-"""
+# NOTE: financialmodelingprep's legacy v3 API (nested under "financials"/"profile") was
+# retired; these read from the current "stable" API's flat, per-year array format instead.
+
 def read_company_profile(company):
     file = open(f"{DATA_DIR}/company-profile-{company}.txt")
     data = json.load(file)
-    price = float(data["profile"]["price"])
-    file.close()
-    return {"price": price}
-"""
-def read_company_profile(company):
-    file = open(f"{DATA_DIR}/company-profile-{company}.txt")
-    data = json.load(file)
-    sector = str(data["profile"]["sector"])
-    price = float(data["profile"]["price"])
-    beta = float(data["profile"]["beta"])
+    profile = data[0]
+    sector = str(profile["sector"])
+    price = float(profile["price"])
+    beta = float(profile["beta"])
     file.close()
     return {"price": price, "sector": sector, "beta": beta}
 
@@ -109,12 +123,12 @@ def read_cash_flow(company, year_start, year_end):
     file = open(f"{DATA_DIR}/cash-flow-{company}.txt")
     data = json.load(file)
     cash_flow = {}
-    for ent in data["financials"]:
-        y = int(ent["date"][0:4])
+    for ent in data:
+        y = int(ent["fiscalYear"])
         if year_start < y <= year_end:
             cash_flow[y] = {
-                "dna": float(ent["Depreciation & Amortization"]),
-                "capex": float(ent["Capital Expenditure"]),
+                "dna": float(ent["depreciationAndAmortization"]),
+                "capex": float(ent["capitalExpenditure"]),
             }
     file.close()
     return cash_flow
@@ -124,15 +138,15 @@ def read_balance_sheet(company, year_start, year_end):
     file = open(f"{DATA_DIR}/balance-sheet-{company}.txt")
     data = json.load(file)
     balance_sheet = {}
-    for ent in data["financials"]:
-        y = int(ent["date"][0:4])
+    for ent in data:
+        y = int(ent["fiscalYear"])
         if year_start < y <= year_end:
             balance_sheet[y] = {
-                "cash": float(ent["Cash and cash equivalents"]),
-                "ar": float(ent["Receivables"]),
-                "inv": float(ent["Inventories"]),
-                "ap": float(ent["Payables"]),
-                "debt": float(ent["Total debt"]),
+                "cash": float(ent["cashAndCashEquivalents"]),
+                "ar": float(ent["netReceivables"]),
+                "inv": float(ent["inventory"]),
+                "ap": float(ent["accountPayables"]),
+                "debt": float(ent["totalDebt"]),
             }
     file.close()
     return balance_sheet
@@ -141,15 +155,28 @@ def read_balance_sheet(company, year_start, year_end):
 def read_income_statement(company, year_start, year_end):
     file = open(f"{DATA_DIR}/income-statement-{company}.txt")
     data = json.load(file)
+    # Sorted ascending so revenue growth can be computed year-over-year.
+    entries = sorted(data, key=lambda ent: ent["date"])
     income_statement = {}
-    for ent in data["financials"]:
-        y = int(ent["date"][0:4])
+    prev_revenue = None
+    for ent in entries:
+        y = int(ent["fiscalYear"])
+        revenue = float(ent["revenue"])
+        rvgr = (revenue - prev_revenue) / prev_revenue if prev_revenue else 0.0
+        prev_revenue = revenue
         if year_start < y <= year_end:
             income_statement[y] = {
-                "rv": float(ent["Revenue"]),
-                "rvgr": float(ent["Revenue Growth"]),
-                "ebit%": float(ent["EBIT Margin"]),
-                "shares": float(ent["Weighted Average Shs Out"])
+                "rv": revenue,
+                "rvgr": rvgr,
+                "ebit%": float(ent["ebit"]) / revenue,
+                "shares": float(ent["weightedAverageShsOut"]),
             }
     file.close()
     return income_statement
+
+
+def latest_available_year(company):
+    file = open(f"{DATA_DIR}/income-statement-{company}.txt")
+    data = json.load(file)
+    file.close()
+    return max(int(ent["fiscalYear"]) for ent in data)

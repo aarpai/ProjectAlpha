@@ -1,31 +1,32 @@
-from utils import read_income_statement, read_balance_sheet, read_cash_flow, read_company_profile, companies
+import sys
+from utils import read_income_statement, read_balance_sheet, read_cash_flow, read_company_profile, latest_available_year, companies
 import pandas as pd
 
 def CompDCF(comp):
-    last_year = 2019
-    income = read_income_statement(comp, 2014, 2019)
-    ebit = read_income_statement(comp, 2014, 2019)
-    depre = read_cash_flow(comp, 2014, 2019)
-    capex = read_cash_flow(comp, 2014, 2019)
-    NWC = read_balance_sheet(comp, 2014, 2019)
-    shares = read_income_statement(comp, 2018, 2019)
-    debt = read_balance_sheet(comp, 2018, 2019)
-    cash = read_balance_sheet(comp, 2018, 2019)
+    last_year = latest_available_year(comp)
+    income = read_income_statement(comp, last_year - 5, last_year)
+    ebit = read_income_statement(comp, last_year - 5, last_year)
+    depre = read_cash_flow(comp, last_year - 5, last_year)
+    capex = read_cash_flow(comp, last_year - 5, last_year)
+    NWC = read_balance_sheet(comp, last_year - 5, last_year)
+    shares = read_income_statement(comp, last_year - 1, last_year)
+    debt = read_balance_sheet(comp, last_year - 1, last_year)
+    cash = read_balance_sheet(comp, last_year - 1, last_year)
     price = read_company_profile(comp)
     sector = read_company_profile(comp)
     if len(income) < 5:
-        last_year = 2018
-        income = read_income_statement(comp, 2013, 2018)
-        ebit = read_income_statement(comp, 2013, 2018)
-        depre = read_cash_flow(comp, 2013, 2018)
-        capex = read_cash_flow(comp, 2013, 2018)
-        NWC = read_balance_sheet(comp, 2013, 2018)
-        shares = read_income_statement(comp, 2017, 2018)
-        debt = read_balance_sheet(comp, 2017, 2018)
-        cash = read_balance_sheet(comp, 2017, 2018)
+        last_year = last_year - 1
+        income = read_income_statement(comp, last_year - 5, last_year)
+        ebit = read_income_statement(comp, last_year - 5, last_year)
+        depre = read_cash_flow(comp, last_year - 5, last_year)
+        capex = read_cash_flow(comp, last_year - 5, last_year)
+        NWC = read_balance_sheet(comp, last_year - 5, last_year)
+        shares = read_income_statement(comp, last_year - 1, last_year)
+        debt = read_balance_sheet(comp, last_year - 1, last_year)
+        cash = read_balance_sheet(comp, last_year - 1, last_year)
         price = read_company_profile(comp)
         sector = read_company_profile(comp)
-  
+
 
 #CALCULATE AVERGE REVENUE GROWTH OVER LAST 5 YEARS
     sum_ = 0
@@ -162,7 +163,10 @@ def CompDCF(comp):
         print(outp, intrinsic_value)
         return outp
 
-banana = pd.DataFrame()
-for comp in companies:
+tickers = sys.argv[1:] if len(sys.argv) > 1 else companies
+rows = []
+for comp in tickers:
     Grud = CompDCF(comp)
-    banana = banana.append(Grud)
+    if Grud:
+        rows.append(Grud)
+banana = pd.DataFrame(rows)
